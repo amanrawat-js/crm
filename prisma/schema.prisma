@@ -1,0 +1,116 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+  url       = env("DATABASE_URL")
+  directUrl = env("DIRECT_URL")
+}
+
+enum Role {
+  ADMIN
+  AGENT
+}
+
+enum LeadStage {
+  NEW
+  CONTACTED
+  QUALIFIED
+  PROPOSAL
+  NEGOTIATION
+  WON
+  LOST
+}
+
+enum LeadSource {
+  WEBSITE
+  REFERRAL
+  WALK_IN
+  SOCIAL_MEDIA
+  PROPERTY_PORTAL
+  COLD_CALL
+  OTHER
+}
+
+enum ActivityType {
+  CALL
+  EMAIL
+  MEETING
+  SITE_VISIT
+  NOTE
+}
+
+model User {
+  id           String     @id @default(cuid())
+  name         String
+  email        String     @unique
+  passwordHash String
+  role         Role       @default(AGENT)
+  phone        String?
+  avatar       String?
+  isActive     Boolean    @default(true)
+  createdAt    DateTime   @default(now())
+  updatedAt    DateTime   @updatedAt
+
+  assignedLeads Lead[]     @relation("AssignedAgent")
+  activities    Activity[] @relation("ActivityCreator")
+  followUps     FollowUp[] @relation("FollowUpAssignee")
+}
+
+model Lead {
+  id               String     @id @default(cuid())
+  name             String
+  email            String?
+  phone            String?
+  source           LeadSource @default(OTHER)
+  stage            LeadStage  @default(NEW)
+  propertyInterest String?
+  budget           Float?
+  location         String?
+  notes            String?
+  assignedToId     String?
+  assignedTo       User?      @relation("AssignedAgent", fields: [assignedToId], references: [id], onDelete: SetNull)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+
+  activities Activity[]
+  followUps  FollowUp[]
+
+  @@index([assignedToId])
+  @@index([stage])
+  @@index([source])
+}
+
+model Activity {
+  id          String       @id @default(cuid())
+  type        ActivityType
+  title       String
+  description String?
+  leadId      String
+  lead        Lead         @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  createdById String
+  createdBy   User         @relation("ActivityCreator", fields: [createdById], references: [id], onDelete: Cascade)
+  createdAt   DateTime     @default(now())
+
+  @@index([leadId])
+  @@index([createdById])
+}
+
+model FollowUp {
+  id           String   @id @default(cuid())
+  title        String
+  description  String?
+  dueDate      DateTime
+  completed    Boolean  @default(false)
+  leadId       String
+  lead         Lead     @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  assignedToId String
+  assignedTo   User     @relation("FollowUpAssignee", fields: [assignedToId], references: [id], onDelete: Cascade)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+
+  @@index([leadId])
+  @@index([assignedToId])
+  @@index([dueDate])
+}
